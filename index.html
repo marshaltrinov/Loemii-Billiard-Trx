@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <base target="_top">
-  <style>
+	<head>
+		<base target="_top">
+			<style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #0d0d0d;
@@ -128,8 +128,8 @@
       }
     }
   </style>
-</head>
-<body>
+		</head>
+		<body>
   <div class="background-image"></div>
   <div class="container">
     <div class="header">
@@ -159,9 +159,91 @@
     </form>
     <div id="output"></div>
   </div>
-  
+
+  <!-- Load the Google API client library -->
+  <script src="https://apis.google.com/js/api.js"></script>
   <script>
-    // Function to update the current time and date in long format
+    let CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID'; // Replace with your Google Client ID
+    let API_KEY = 'YOUR_GOOGLE_API_KEY'; // Replace with your Google API Key
+    let DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
+    let SCOPES = "https://www.googleapis.com/auth/spreadsheets";
+
+    let sheetId = '1yPRCQrY_Va3tbrTZ-HpyfyXRte9aqI7HQQOVDQiZAfg'; // Replace with your Google Sheets ID
+
+    function handleClientLoad() {
+      gapi.load('client:auth2', initClient);
+    }
+
+    function initClient() {
+      gapi.client.init({
+        apiKey: API_KEY,
+        clientId: CLIENT_ID,
+        discoveryDocs: DISCOVERY_DOCS,
+        scope: SCOPES
+      }).then(function () {
+        // Listen for sign-in state changes
+        gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+
+        // Handle the initial sign-in state
+        updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+      }, function(error) {
+        console.log(JSON.stringify(error, null, 2));
+      });
+    }
+
+    function updateSigninStatus(isSignedIn) {
+      if (isSignedIn) {
+        // User is signed in, allow form submission
+        document.getElementById('rentalForm').onsubmit = function(event) {
+          event.preventDefault(); // Prevent the default form submission
+          submitForm();
+        };
+      } else {
+        // Show sign-in button if the user is not signed in
+        document.getElementById('output').innerText = 'Please sign in to submit data.';
+        var authButton = document.createElement('button');
+        authButton.textContent = 'Sign in';
+        authButton.onclick = function() {
+          gapi.auth2.getAuthInstance().signIn();
+        };
+        document.body.appendChild(authButton);
+      }
+    }
+
+    function submitForm() {
+      const form = document.getElementById('rentalForm');
+      const formData = new FormData(form);
+      const formObject = Object.fromEntries(formData.entries());
+
+      const params = {
+        spreadsheetId: sheetId,
+        range: "Transaksi!A1:E1",
+        valueInputOption: "USER_ENTERED",
+        insertDataOption: "INSERT_ROWS",
+      };
+
+      const valueRangeBody = {
+        "range": "Transaksi!A1:E1",
+        "majorDimension": "ROWS",
+        "values": [
+          [new Date(), formObject.nama, formObject.noTelp, formObject.durasi, formObject.biaya]
+        ]
+      };
+
+      gapi.client.sheets.spreadsheets.values.append(params, valueRangeBody).then(function(response) {
+        console.log(response.result);
+        document.getElementById('output').innerText = 'Data saved successfully!';
+        form.reset();
+      }, function(error) {
+        console.log(error);
+        document.getElementById('output').innerText = 'Error saving data!';
+      });
+    }
+
+    // Load the API and make an API call after the user authenticates
+    gapi.load('client:auth2', handleClientLoad);
+
+    // Update time and date
     function updateTime() {
       const now = new Date();
       const timeString = now.toLocaleTimeString();
@@ -169,36 +251,8 @@
       document.getElementById('currentTime').textContent = timeString;
       document.getElementById('currentDate').textContent = dateString;
     }
-    
-    // Update time every second
     setInterval(updateTime, 1000);
-    updateTime(); // Initial call to set the time immediately
-    
-    // Load rental count from Google Sheets
-    function loadRentalCount() {
-      google.script.run.withSuccessHandler(function(response) {
-        document.getElementById('rentalCount').textContent = `Rental Count: ${response}`;
-      }).getRentalCount();
-    }
-    
-    loadRentalCount(); // Load rental count on page load
-    
-    // Handle form submission
-    document.getElementById('rentalForm').onsubmit = function(event) {
-      event.preventDefault(); // Prevent the default form submission
-
-      const form = event.target;
-      const formData = new FormData(form);
-      const formObject = Object.fromEntries(formData.entries()); // Convert form data to an object
-
-      console.log("Form data:", formObject); // Log form data for debugging
-
-      google.script.run.withSuccessHandler(function(response) {
-        document.getElementById('output').innerText = `Thank you, Your data is recorded.`;
-        form.reset();
-        loadRentalCount(); // Reload rental count after form submission
-      }).processForm(formObject);
-    };
+    updateTime();
   </script>
 </body>
-</html>
+	</html>
